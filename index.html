@@ -7,15 +7,36 @@
 <meta name="theme-color" content="#0f766e">
 <title>筋トレ記録</title>
 <style>
-  body { font-family: sans-serif; margin: 0; padding: 16px; background: #f8fafc; color: #1f2937; max-width: 480px; margin-left: auto; margin-right: auto; }
-  h1 { font-size: 20px; color: #0f766e; }
+  * { box-sizing: border-box; }
+  body { font-family: sans-serif; margin: 0; padding: 16px; background: #f8fafc; color: #1f2937; max-width: 520px; margin-left: auto; margin-right: auto; }
+  h1 { font-size: 20px; color: #0f766e; margin: 4px 0 12px; }
   h2 { font-size: 17px; color: #0f766e; margin-top: 24px; }
-  input, select, button { font-size: 16px; padding: 8px; margin: 4px 0; width: 100%; box-sizing: border-box; }
-  button { background: #0f766e; color: #fff; border: none; border-radius: 8px; padding: 12px; }
-  label { display: block; margin-top: 8px; font-size: 14px; }
+  label { display: block; margin-top: 8px; font-size: 14px; font-weight: bold; }
+  input[type="date"] { font-size: 16px; padding: 10px; margin: 6px 0 14px; width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; }
+
+  .head, .row { display: grid; grid-template-columns: 1fr 118px 118px 28px; gap: 6px; align-items: center; }
+  .head { font-size: 12px; color: #64748b; font-weight: bold; padding: 0 2px 4px; }
+  .head span:nth-child(2), .head span:nth-child(3) { text-align: center; }
+  .row { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 6px; margin: 8px 0; }
+  .row input[type="text"] { font-size: 16px; padding: 9px 6px; width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; min-width: 0; }
+  .stepper { display: flex; align-items: center; gap: 3px; }
+  .stepper button { width: 34px; height: 40px; flex-shrink: 0; font-size: 18px; line-height: 1; background: #0f766e; color: #fff; border: none; border-radius: 8px; padding: 0; }
+  .stepper button:active { opacity: .7; }
+  .stepper input { width: 44px; text-align: center; font-size: 16px; padding: 9px 0; border: 1px solid #cbd5e1; border-radius: 8px; -moz-appearance: textfield; appearance: textfield; }
+  .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .del-row { width: 26px; height: 40px; background: none; border: none; color: #94a3b8; font-size: 18px; padding: 0; }
+  .unit { font-size: 11px; color: #64748b; text-align: center; margin-top: 2px; }
+
+  #add-exercise { width: 100%; background: #fff; color: #0f766e; border: 1px dashed #0f766e; border-radius: 8px; padding: 10px; font-size: 15px; margin-top: 4px; }
+  #record-btn { width: 100%; background: #0f766e; color: #fff; border: none; border-radius: 8px; padding: 14px; font-size: 17px; font-weight: bold; margin-top: 16px; }
+  #record-btn:active { opacity: .8; }
+  .hint { font-size: 12px; color: #64748b; margin-top: 6px; }
+
   ul { list-style: none; padding: 0; }
-  li { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  li button { width: auto; padding: 6px 12px; background: #94a3b8; flex-shrink: 0; }
+  li { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
+  li button { width: auto; padding: 6px 12px; background: #94a3b8; color: #fff; border: none; border-radius: 8px; flex-shrink: 0; font-size: 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
+  .legend { font-size: 12px; color: #475569; margin-top: 8px; line-height: 1.9; }
 </style>
 </head>
 <body>
@@ -23,21 +44,13 @@
 
   <label>日付</label>
   <input type="date" id="date">
-  <label>種目</label>
-  <select id="exercise">
-    <option>ベンチプレス</option>
-    <option>スクワット</option>
-    <option>デッドリフト</option>
-    <option>懸垂</option>
-    <option>腕立て伏せ</option>
-  </select>
-  <label>重量（kg）</label>
-  <input type="number" id="weight" value="0">
-  <label>回数</label>
-  <input type="number" id="reps" value="10">
-  <label>セット数</label>
-  <input type="number" id="sets" value="3">
-  <button onclick="addLog()">記録する</button>
+
+  <div class="head"><span>種目（編集できます）</span><span>回数</span><span>セット</span><span></span></div>
+  <div id="rows"></div>
+  <button id="add-exercise" onclick="addExerciseRow('')">＋ 種目を追加</button>
+
+  <button id="record-btn" onclick="recordAll()">記録する</button>
+  <p class="hint">回数が 0 の種目は記録されません。やった種目だけ回数を入れてください。</p>
 
   <div id="stats"></div>
   <div id="chart"></div>
@@ -47,101 +60,225 @@
 
 <script>
 // 保存先の名前（合言葉）
-const KEY = 'kintore-logs';
+const KEY = 'kintore-logs';              // 記録（旧バージョンと共通＝今までの記録が引き継がれます）
+const EX_KEY = 'kintore-exercises-v2';   // 種目名の並び
+const DEF_KEY = 'kintore-defaults-v2';   // 種目ごとの前回の回数・セット数
 
-// 全件を読む（なければ空の配列）
-function loadLogs() {
-  const text = localStorage.getItem(KEY);
-  return text ? JSON.parse(text) : [];
+const DEFAULT_EXERCISES = ['腕立て', 'ダンベル', 'スクワット', '腹筋'];
+const COLORS = ['#0f766e', '#2563eb', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'];
+
+function loadJSON(key, fallback) {
+  const text = localStorage.getItem(key);
+  try { return text ? JSON.parse(text) : fallback; } catch (e) { return fallback; }
+}
+function loadLogs() { return loadJSON(KEY, []); }
+function saveLogs(logs) { localStorage.setItem(KEY, JSON.stringify(logs)); }
+function loadExercises() {
+  const ex = loadJSON(EX_KEY, null);
+  return (ex && ex.length) ? ex : DEFAULT_EXERCISES.slice();
+}
+function saveExercises(names) { localStorage.setItem(EX_KEY, JSON.stringify(names)); }
+function loadDefaults() { return loadJSON(DEF_KEY, {}); }
+function saveDefaults(d) { localStorage.setItem(DEF_KEY, JSON.stringify(d)); }
+
+// 種目名 → 色（記録に出てきた順に固定で割り当てる）
+function colorMap(logs) {
+  const map = {};
+  let i = 0;
+  logs.slice().reverse().forEach(function(log) {
+    if (!(log.exercise in map)) { map[log.exercise] = COLORS[i % COLORS.length]; i++; }
+  });
+  return map;
 }
 
-// 全件を保存する
-function saveLogs(logs) {
-  localStorage.setItem(KEY, JSON.stringify(logs));
+// ---- 入力欄（行）の表示 ----
+function buildRows() {
+  const names = loadExercises();
+  const defaults = loadDefaults();
+  const wrap = document.getElementById('rows');
+  wrap.innerHTML = '';
+  names.forEach(function(name) { wrap.appendChild(makeRow(name, defaults)); });
 }
 
-function addLog() {
-  const log = {
-    id: Date.now(),
-    date: document.getElementById('date').value,
-    exercise: document.getElementById('exercise').value,
-    weight: Number(document.getElementById('weight').value),
-    reps: Number(document.getElementById('reps').value),
-    sets: Number(document.getElementById('sets').value)
-  };
-  if (!log.date) { alert('日付を選んでください'); return; }
+function makeRow(name, defaults) {
+  const d = (defaults && defaults[name]) || { reps: 10, sets: 3 };
+  const row = document.createElement('div');
+  row.className = 'row';
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.className = 'ex-name';
+  nameInput.value = name;
+  nameInput.placeholder = '種目名';
+  nameInput.onchange = syncExerciseNames;
+  row.appendChild(nameInput);
+
+  row.appendChild(makeStepper('reps', d.reps, 5));
+  row.appendChild(makeStepper('sets', d.sets, 1));
+
+  const del = document.createElement('button');
+  del.className = 'del-row';
+  del.textContent = '×';
+  del.title = 'この種目を消す';
+  del.onclick = function() { row.remove(); syncExerciseNames(); };
+  row.appendChild(del);
+  return row;
+}
+
+function makeStepper(kind, value, step) {
+  const box = document.createElement('div');
+  const stepper = document.createElement('div');
+  stepper.className = 'stepper';
+  const minus = document.createElement('button');
+  minus.textContent = '−';
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.className = kind;
+  input.value = value;
+  input.min = '0';
+  input.inputMode = 'numeric';
+  const plus = document.createElement('button');
+  plus.textContent = '＋';
+  minus.onclick = function() { input.value = Math.max(0, Number(input.value || 0) - step); };
+  plus.onclick = function() { input.value = Number(input.value || 0) + step; };
+  stepper.appendChild(minus); stepper.appendChild(input); stepper.appendChild(plus);
+  const unit = document.createElement('div');
+  unit.className = 'unit';
+  unit.textContent = kind === 'reps' ? '回（5ずつ）' : 'セット（1ずつ）';
+  box.appendChild(stepper); box.appendChild(unit);
+  return box;
+}
+
+function currentNames() {
+  return Array.from(document.querySelectorAll('.ex-name')).map(function(el) { return el.value.trim(); });
+}
+function syncExerciseNames() { saveExercises(currentNames()); }
+
+function addExerciseRow(name) {
+  document.getElementById('rows').appendChild(makeRow(name || '', loadDefaults()));
+  syncExerciseNames();
+}
+
+// ---- 記録 ----
+function recordAll() {
+  const date = document.getElementById('date').value;
+  if (!date) { alert('日付を選んでください'); return; }
+  syncExerciseNames();
+  const defaults = loadDefaults();
+  const newLogs = [];
+  const now = Date.now();
+  document.querySelectorAll('.row').forEach(function(row, idx) {
+    const name = row.querySelector('.ex-name').value.trim() || '（無題）';
+    const reps = Number(row.querySelector('.reps').value || 0);
+    const sets = Number(row.querySelector('.sets').value || 0);
+    if (reps <= 0 || sets <= 0) return; // 0 の種目は記録しない
+    newLogs.push({ id: now + idx, date: date, exercise: name, weight: 0, reps: reps, sets: sets });
+    defaults[name] = { reps: reps, sets: sets }; // 次回はこの値が最初から入る
+  });
+  if (!newLogs.length) { alert('回数が 0 のため、記録する種目がありません'); return; }
+  saveDefaults(defaults);
   const logs = loadLogs();
-  logs.unshift(log); // 先頭に追加（新しい順）
+  newLogs.reverse().forEach(function(l) { logs.unshift(l); });
   saveLogs(logs);
+  render();
+  alert(newLogs.length + ' 種目を記録しました');
+}
+
+function deleteLog(id) {
+  saveLogs(loadLogs().filter(function(log) { return log.id !== id; }));
   render();
 }
 
+// ---- 一覧・集計・グラフ ----
 function render() {
   const logs = loadLogs();
+  const colors = colorMap(logs);
   const ul = document.getElementById('list');
   ul.innerHTML = '';
   logs.forEach(function(log) {
     const li = document.createElement('li');
-    li.textContent = log.date + ' ' + log.exercise + ' '
-      + log.weight + 'kg x ' + log.reps + '回 x ' + log.sets + 'セット ';
+    const left = document.createElement('span');
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.background = colors[log.exercise] || '#94a3b8';
+    left.appendChild(dot);
+    let text = log.date + ' ' + log.exercise + ' ' + log.reps + '回 x ' + log.sets + 'セット';
+    if (log.weight) text += '（' + log.weight + 'kg）'; // 旧バージョンの記録用
+    left.appendChild(document.createTextNode(text));
     const btn = document.createElement('button');
     btn.textContent = '削除';
-    btn.style.width = 'auto';
     btn.onclick = function() { deleteLog(log.id); };
-    li.appendChild(btn);
+    li.appendChild(left); li.appendChild(btn);
     ul.appendChild(li);
   });
-  renderChart(logs);
-}
-
-function deleteLog(id) {
-  const logs = loadLogs().filter(function(log) {
-    return log.id !== id;
-  });
-  saveLogs(logs);
-  render();
+  renderChart(logs, colors);
 }
 
 // その週の月曜日を 'YYYY-MM-DD' で返す
 function mondayKey(dateText) {
   const d = new Date(dateText);
-  const diff = (d.getDay() + 6) % 7; // 月曜からの日数
+  const diff = (d.getDay() + 6) % 7;
   d.setDate(d.getDate() - diff);
   return d.toLocaleDateString('sv-SE');
 }
 
-// 直近4週ぶんの実施回数を数える
+// 直近4週ぶんを、週 × 種目ごとに数える
 function last4Weeks(logs) {
   const weeks = [];
   const today = new Date();
   for (let i = 3; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i * 7);
-    weeks.push({ key: mondayKey(d.toLocaleDateString('sv-SE')), count: 0 });
+    weeks.push({ key: mondayKey(d.toLocaleDateString('sv-SE')), total: 0, byExercise: {} });
   }
   logs.forEach(function(log) {
     const k = mondayKey(log.date);
-    weeks.forEach(function(w) { if (w.key === k) w.count++; });
+    weeks.forEach(function(w) {
+      if (w.key === k) {
+        w.total++;
+        w.byExercise[log.exercise] = (w.byExercise[log.exercise] || 0) + 1;
+      }
+    });
   });
   return weeks;
 }
 
-function renderChart(logs) {
+function renderChart(logs, colors) {
   const weeks = last4Weeks(logs);
-  const max = Math.max(1, ...weeks.map(function(w) { return w.count; }));
-  let html = '<p>直近4週の実施回数</p>'
-    + '<div style="display:flex; align-items:flex-end; gap:12px; height:90px;">';
+  const max = Math.max(1, ...weeks.map(function(w) { return w.total; }));
+  const usedExercises = [];
   weeks.forEach(function(w) {
-    const h = Math.round(w.count / max * 80);
+    Object.keys(w.byExercise).forEach(function(name) {
+      if (!usedExercises.includes(name)) usedExercises.push(name);
+    });
+  });
+
+  let html = '<h2>直近4週の実施回数（種目ごと）</h2>'
+    + '<div style="display:flex; align-items:flex-end; gap:16px; height:110px;">';
+  weeks.forEach(function(w) {
     html += '<div style="text-align:center;">'
-      + '<div>' + w.count + '</div>'
-      + '<div style="width:36px; height:' + h + 'px; background:#0f766e;"></div>'
-      + '<div>' + w.key.slice(5) + '</div></div>';
+      + '<div style="font-weight:bold;">' + w.total + '</div>'
+      + '<div style="width:40px; height:80px; display:flex; flex-direction:column-reverse;">';
+    usedExercises.forEach(function(name) {
+      const c = w.byExercise[name] || 0;
+      if (!c) return;
+      const h = Math.round(c / max * 80);
+      html += '<div title="' + name + ' ' + c + '回" style="height:' + h + 'px; background:' + (colors[name] || '#94a3b8') + '; border-top:1px solid #fff;"></div>';
+    });
+    html += '</div><div style="font-size:12px; color:#64748b;">' + w.key.slice(5) + '</div></div>';
   });
   html += '</div>';
+
+  if (usedExercises.length) {
+    html += '<div class="legend">';
+    usedExercises.forEach(function(name) {
+      html += '<span style="margin-right:10px;"><span class="dot" style="background:' + (colors[name] || '#94a3b8') + '"></span>' + name + '</span>';
+    });
+    html += '</div>';
+  }
   document.getElementById('chart').innerHTML = html;
 
-  const thisWeek = weeks[3].count;
+  const thisWeek = weeks[3].total;
   const days = new Set(logs.map(function(l) { return l.date; })).size;
   document.getElementById('stats').innerHTML =
     '<p><strong>今週 ' + thisWeek + '回</strong>'
@@ -149,8 +286,8 @@ function renderChart(logs) {
 }
 
 // ページを開いたときの初期処理
-document.getElementById('date').value =
-  new Date().toLocaleDateString('sv-SE');
+document.getElementById('date').value = new Date().toLocaleDateString('sv-SE');
+buildRows();
 render();
 </script>
 </body>
