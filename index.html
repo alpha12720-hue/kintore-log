@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f766e">
+<title>筋トレ記録</title>
+<style>
+  body { font-family: sans-serif; margin: 0; padding: 16px; background: #f8fafc; color: #1f2937; max-width: 480px; margin-left: auto; margin-right: auto; }
+  h1 { font-size: 20px; color: #0f766e; }
+  h2 { font-size: 17px; color: #0f766e; margin-top: 24px; }
+  input, select, button { font-size: 16px; padding: 8px; margin: 4px 0; width: 100%; box-sizing: border-box; }
+  button { background: #0f766e; color: #fff; border: none; border-radius: 8px; padding: 12px; }
+  label { display: block; margin-top: 8px; font-size: 14px; }
+  ul { list-style: none; padding: 0; }
+  li { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  li button { width: auto; padding: 6px 12px; background: #94a3b8; flex-shrink: 0; }
+</style>
+</head>
+<body>
+  <h1>筋トレ記録</h1>
+
+  <label>日付</label>
+  <input type="date" id="date">
+  <label>種目</label>
+  <select id="exercise">
+    <option>ベンチプレス</option>
+    <option>スクワット</option>
+    <option>デッドリフト</option>
+    <option>懸垂</option>
+    <option>腕立て伏せ</option>
+  </select>
+  <label>重量（kg）</label>
+  <input type="number" id="weight" value="0">
+  <label>回数</label>
+  <input type="number" id="reps" value="10">
+  <label>セット数</label>
+  <input type="number" id="sets" value="3">
+  <button onclick="addLog()">記録する</button>
+
+  <div id="stats"></div>
+  <div id="chart"></div>
+
+  <h2>記録一覧</h2>
+  <ul id="list"></ul>
+
+<script>
+// 保存先の名前（合言葉）
+const KEY = 'kintore-logs';
+
+// 全件を読む（なければ空の配列）
+function loadLogs() {
+  const text = localStorage.getItem(KEY);
+  return text ? JSON.parse(text) : [];
+}
+
+// 全件を保存する
+function saveLogs(logs) {
+  localStorage.setItem(KEY, JSON.stringify(logs));
+}
+
+function addLog() {
+  const log = {
+    id: Date.now(),
+    date: document.getElementById('date').value,
+    exercise: document.getElementById('exercise').value,
+    weight: Number(document.getElementById('weight').value),
+    reps: Number(document.getElementById('reps').value),
+    sets: Number(document.getElementById('sets').value)
+  };
+  if (!log.date) { alert('日付を選んでください'); return; }
+  const logs = loadLogs();
+  logs.unshift(log); // 先頭に追加（新しい順）
+  saveLogs(logs);
+  render();
+}
+
+function render() {
+  const logs = loadLogs();
+  const ul = document.getElementById('list');
+  ul.innerHTML = '';
+  logs.forEach(function(log) {
+    const li = document.createElement('li');
+    li.textContent = log.date + ' ' + log.exercise + ' '
+      + log.weight + 'kg x ' + log.reps + '回 x ' + log.sets + 'セット ';
+    const btn = document.createElement('button');
+    btn.textContent = '削除';
+    btn.style.width = 'auto';
+    btn.onclick = function() { deleteLog(log.id); };
+    li.appendChild(btn);
+    ul.appendChild(li);
+  });
+  renderChart(logs);
+}
+
+function deleteLog(id) {
+  const logs = loadLogs().filter(function(log) {
+    return log.id !== id;
+  });
+  saveLogs(logs);
+  render();
+}
+
+// その週の月曜日を 'YYYY-MM-DD' で返す
+function mondayKey(dateText) {
+  const d = new Date(dateText);
+  const diff = (d.getDay() + 6) % 7; // 月曜からの日数
+  d.setDate(d.getDate() - diff);
+  return d.toLocaleDateString('sv-SE');
+}
+
+// 直近4週ぶんの実施回数を数える
+function last4Weeks(logs) {
+  const weeks = [];
+  const today = new Date();
+  for (let i = 3; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i * 7);
+    weeks.push({ key: mondayKey(d.toLocaleDateString('sv-SE')), count: 0 });
+  }
+  logs.forEach(function(log) {
+    const k = mondayKey(log.date);
+    weeks.forEach(function(w) { if (w.key === k) w.count++; });
+  });
+  return weeks;
+}
+
+function renderChart(logs) {
+  const weeks = last4Weeks(logs);
+  const max = Math.max(1, ...weeks.map(function(w) { return w.count; }));
+  let html = '<p>直近4週の実施回数</p>'
+    + '<div style="display:flex; align-items:flex-end; gap:12px; height:90px;">';
+  weeks.forEach(function(w) {
+    const h = Math.round(w.count / max * 80);
+    html += '<div style="text-align:center;">'
+      + '<div>' + w.count + '</div>'
+      + '<div style="width:36px; height:' + h + 'px; background:#0f766e;"></div>'
+      + '<div>' + w.key.slice(5) + '</div></div>';
+  });
+  html += '</div>';
+  document.getElementById('chart').innerHTML = html;
+
+  const thisWeek = weeks[3].count;
+  const days = new Set(logs.map(function(l) { return l.date; })).size;
+  document.getElementById('stats').innerHTML =
+    '<p><strong>今週 ' + thisWeek + '回</strong>'
+    + ' / 累計 ' + logs.length + '回 / 実施日数 ' + days + '日</p>';
+}
+
+// ページを開いたときの初期処理
+document.getElementById('date').value =
+  new Date().toLocaleDateString('sv-SE');
+render();
+</script>
+</body>
+</html>
